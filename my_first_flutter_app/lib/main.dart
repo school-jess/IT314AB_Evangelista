@@ -84,7 +84,6 @@ class MyHomePage extends StatelessWidget {
         ),
       ),
     );
-
     Card favoriteGamesCard = Card(
       clipBehavior: Clip.antiAlias,
       elevation: 2.0,
@@ -114,19 +113,50 @@ class MyHomePage extends StatelessWidget {
       ),
     );
 
+    Card ctf2 = Card(
+      clipBehavior: Clip.antiAlias,
+      elevation: 2.0,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          profileCard,
+          // const SizedBox(height: 16),
+          Divider(
+            color: Color.from(alpha: 1.0, red: 1.0, green: 0.0, blue: 0.0),
+          ),
+          favoriteGamesCard,
+        ],
+      ),
+    );
+
+    var profiles = {
+      "names": [null, "Maria", "Jess", "Jan", "Jake"],
+      "courseSection": ["BSIT-3", null, "BSIT-3", "BSIT-3", "BSIT-3"],
+      "age": [21, 22, null, 23, 21],
+      "hobby": ["Gaming", "Basketball", "Soccer", null, "Reading"],
+    };
+    
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: const Text('My First Flutter Application'),
       ),
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          profileCard,
-          // const SizedBox(height: 16),
-          Divider(color: Color.from(alpha: 1.0, red: 1.0, green: 0.0, blue: 0.0)),
-          favoriteGamesCard
-        ],
+      body: ListView.builder(
+        itemCount: profiles["names"]?.length,
+        itemBuilder: (ctx, ind) {
+          return Column(
+            children: [
+              Text(profiles["names"]?[ind]?.toString() ?? "Not provided"),
+              const SizedBox(height: 16),
+              Text(profiles["courseSection"]?[ind]?.toString() ?? "Not provided"),
+              const SizedBox(height: 16),
+              Text(profiles["age"]?[ind]?.toString() ?? "Not provided"),
+              const SizedBox(height: 16),
+              Text(profiles["hobby"]?[ind]?.toString() ?? "Not provided"),
+              const SizedBox(height: 16),
+            ],
+          );
+        },
       ),
     );
   }
