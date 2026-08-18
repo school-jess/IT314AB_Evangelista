@@ -1,30 +1,57 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:my_first_flutter_app/data/students_data.dart';
 import 'package:my_first_flutter_app/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('Shows empty state when there are no students', (WidgetTester tester) async {
+    await tester.pumpWidget(const MyApp(records: []));
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(find.text('No students available'), findsOneWidget);
+    expect(find.text('New student records will appear here.'), findsOneWidget);
+    expect(find.byType(StudentCard), findsNothing);
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  test('Students are sorted alphabetically by name', () {
+    final names = studentsSortedByName.map((s) => s.name).toList();
+    final expected = [...names]..sort();
+    expect(names, equals(expected));
+  });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  testWidgets('Sorts students alphabetically in the UI', (WidgetTester tester) async {
+    await tester.pumpWidget(MyApp(records: studentsSortedByName));
+
+    expect(find.text('Andrea Reyes'), findsOneWidget);
+
+    for (var student in studentsSortedByName.skip(1)) {
+      await tester.scrollUntilVisible(
+        find.text(student.name),
+        200,
+        scrollable: find.byType(Scrollable),
+      );
+      expect(find.text(student.name), findsOneWidget);
+    }
+
+    expect(find.text('Sofia Mendoza'), findsOneWidget);
+  });
+
+  testWidgets('Shows details for every student', (WidgetTester tester) async {
+    await tester.pumpWidget(MyApp(records: studentsSortedByName));
+
+    for (var student in studentsSortedByName) {
+      await tester.scrollUntilVisible(
+        find.text(student.name),
+        200,
+        scrollable: find.byType(Scrollable),
+      );
+      expect(find.textContaining(student.course), findsWidgets);
+      expect(find.textContaining(student.yearLevel), findsWidgets);
+      expect(find.textContaining('${student.age}'), findsWidgets);
+      expect(find.textContaining(student.hobby), findsWidgets);
+      expect(find.textContaining(student.studentId), findsWidgets);
+      expect(find.textContaining(student.email), findsWidgets);
+      expect(find.textContaining(student.favoriteSubject), findsWidgets);
+    }
   });
 }
