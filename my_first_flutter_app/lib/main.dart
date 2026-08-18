@@ -39,81 +39,6 @@ class MyHomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    DateTime now = DateTime.now();
-    String date =
-        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-    Card profileCard = Card(
-      clipBehavior: Clip.antiAlias,
-      elevation: 2.0,
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Image.asset(
-              'assets/images/wp4162286-celeste-game-wallpapers.png',
-              height: 150,
-              fit: BoxFit.contain,
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Jess Mathew Pacquiao Evangelista',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            const Text('BSIT-3', style: TextStyle(fontSize: 20)),
-            const SizedBox(height: 16),
-            const Text(
-              '"My First Flutter Application"',
-              style: TextStyle(fontSize: 18, fontStyle: FontStyle.italic),
-            ),
-            const SizedBox(height: 16),
-            Text(date, style: const TextStyle(fontSize: 18)),
-            const SizedBox(height: 16),
-            const Text('Playing Chess', style: TextStyle(fontSize: 18)),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text('DoomZ', style: TextStyle(fontSize: 18)),
-                const SizedBox(width: 16),
-                const Text('Artmage', style: TextStyle(fontSize: 18)),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-
-    Card favoriteGamesCard = Card(
-      clipBehavior: Clip.antiAlias,
-      elevation: 2.0,
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text(
-              'My favorite games',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text('Celeste', style: TextStyle(fontSize: 18)),
-                const SizedBox(width: 16),
-                const Text('Ultrakill', style: TextStyle(fontSize: 18)),
-              ],
-            ),
-            const SizedBox(height: 16),
-            const Text('Humba', style: TextStyle(fontSize: 18)),
-            const SizedBox(height: 16),
-            const Text('Artmage', style: TextStyle(fontSize: 18)),
-          ],
-        ),
-      ),
-    );
-
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
@@ -121,12 +46,7 @@ class MyHomePage extends StatelessWidget {
       ),
       body: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          profileCard,
-          // const SizedBox(height: 16),
-          Divider(color: Color.from(alpha: 1.0, red: 1.0, green: 0.0, blue: 0.0)),
-          favoriteGamesCard
-        ],
+        children: [],
       ),
     );
   }
