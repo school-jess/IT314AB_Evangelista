@@ -39,10 +39,38 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class MyHomePage extends StatelessWidget {
+class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, this.records = students});
 
   final List<Student> records;
+
+  @override
+  State<MyHomePage> createState() => _MyHomePageState();
+}
+
+class _MyHomePageState extends State<MyHomePage> {
+  late final List<Student> _records;
+
+  @override
+  void initState() {
+    super.initState();
+    _records = [...widget.records];
+  }
+
+  void _removeStudent(Student student) {
+    setState(() {
+      _records.remove(student);
+    });
+  }
+
+  Future<void> _editStudent(Student student) async {
+    final updated = await showStudentEditSheet(context, student);
+    if (updated != null) {
+      setState(() {
+        _records[_records.indexOf(student)] = updated;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,14 +79,19 @@ class MyHomePage extends StatelessWidget {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: const Text('Students'),
       ),
-      body: records.isEmpty
+      body: _records.isEmpty
           ? const EmptyStudentsView()
           : ListView.builder(
               padding: const EdgeInsets.all(16),
-              itemCount: records.length,
+              itemCount: _records.length,
               itemBuilder: (context, index) => Padding(
                 padding: const EdgeInsets.only(bottom: 16),
-                child: StudentCard(student: records[index]),
+                child: ChoosableStudentCard(
+                  key: ValueKey(_records[index].studentId),
+                  student: _records[index],
+                  onRemove: () => _removeStudent(_records[index]),
+                  onEdit: () => _editStudent(_records[index]),
+                ),
               ),
             ),
     );
@@ -102,10 +135,24 @@ class EmptyStudentsView extends StatelessWidget {
   }
 }
 
-class StudentCard extends StatelessWidget {
-  const StudentCard({super.key, required this.student});
-
+class ChoosableStudentCard extends StatefulWidget {
   final Student student;
+  final VoidCallback onRemove;
+  final VoidCallback onEdit;
+
+  const ChoosableStudentCard({
+    super.key,
+    required this.student,
+    required this.onRemove,
+    required this.onEdit,
+  });
+
+  @override
+  State<ChoosableStudentCard> createState() => _ChoosableStudentCardState();
+}
+
+class _ChoosableStudentCardState extends State<ChoosableStudentCard> {
+  bool isFavorite = false;
 
   @override
   Widget build(BuildContext context) {
@@ -119,42 +166,231 @@ class StudentCard extends StatelessWidget {
           children: [
             Center(
               child: Image.asset(
-                student.image,
+                widget.student.image,
                 height: 150,
                 fit: BoxFit.contain,
               ),
             ),
             const SizedBox(height: 16),
             Text(
-              student.name,
+              widget.student.name,
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
-              '${student.course} - ${student.yearLevel}',
-              style: const TextStyle(fontSize: 18),
-            ),
-            const SizedBox(height: 8),
-            Text('Age: ${student.age}', style: const TextStyle(fontSize: 18)),
-            const SizedBox(height: 8),
-            Text(
-              'Hobby: ${student.hobby}',
+              '${widget.student.course} - ${widget.student.yearLevel}',
               style: const TextStyle(fontSize: 18),
             ),
             const SizedBox(height: 8),
             Text(
-              'Student ID: ${student.studentId}',
+              'Age: ${widget.student.age}',
               style: const TextStyle(fontSize: 18),
             ),
             const SizedBox(height: 8),
             Text(
-              'Email: ${student.email}',
+              'Hobby: ${widget.student.hobby}',
               style: const TextStyle(fontSize: 18),
             ),
             const SizedBox(height: 8),
             Text(
-              'Favorite Subject: ${student.favoriteSubject}',
+              'Student ID: ${widget.student.studentId}',
               style: const TextStyle(fontSize: 18),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Email: ${widget.student.email}',
+              style: const TextStyle(fontSize: 18),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Favorite Subject: ${widget.student.favoriteSubject}',
+              style: const TextStyle(fontSize: 18),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      isFavorite = !isFavorite;
+                    });
+                  },
+                  child: Text(isFavorite ? "Unfavorite" : "Favorite"),
+                ),
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: widget.onRemove,
+                  child: Text("Remove"),
+                ),
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: widget.onEdit,
+                  child: Text("Edit"),
+                ),
+              ],
+            ),
+            const SizedBox(width: 8),
+            Text(
+              isFavorite
+                  ? "You have favorited this student"
+                  : "You have unfavorited this student",
+              style: const TextStyle(fontSize: 18),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+Future<Student?> showStudentEditSheet(
+  BuildContext context,
+  Student student,
+) {
+  return showModalBottomSheet<Student>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    builder: (context) => _StudentEditSheet(student: student),
+  );
+}
+
+class _StudentEditSheet extends StatefulWidget {
+  final Student student;
+
+  const _StudentEditSheet({required this.student});
+
+  @override
+  State<_StudentEditSheet> createState() => _StudentEditSheetState();
+}
+
+class _StudentEditSheetState extends State<_StudentEditSheet> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _courseController;
+  late final TextEditingController _yearLevelController;
+  late final TextEditingController _ageController;
+  late final TextEditingController _hobbyController;
+  late final TextEditingController _studentIdController;
+  late final TextEditingController _emailController;
+  late final TextEditingController _favoriteSubjectController;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.student.name);
+    _courseController = TextEditingController(text: widget.student.course);
+    _yearLevelController = TextEditingController(text: widget.student.yearLevel);
+    _ageController = TextEditingController(text: '${widget.student.age}');
+    _hobbyController = TextEditingController(text: widget.student.hobby);
+    _studentIdController = TextEditingController(text: widget.student.studentId);
+    _emailController = TextEditingController(text: widget.student.email);
+    _favoriteSubjectController = TextEditingController(
+      text: widget.student.favoriteSubject,
+    );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _courseController.dispose();
+    _yearLevelController.dispose();
+    _ageController.dispose();
+    _hobbyController.dispose();
+    _studentIdController.dispose();
+    _emailController.dispose();
+    _favoriteSubjectController.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    Navigator.of(context).pop(
+      Student(
+        image: widget.student.image,
+        name: _nameController.text.trim(),
+        course: _courseController.text.trim(),
+        yearLevel: _yearLevelController.text.trim(),
+        age: int.tryParse(_ageController.text.trim()) ?? widget.student.age,
+        hobby: _hobbyController.text.trim(),
+        studentId: _studentIdController.text.trim(),
+        email: _emailController.text.trim(),
+        favoriteSubject: _favoriteSubjectController.text.trim(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Edit ${widget.student.name}',
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(labelText: 'Name'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _courseController,
+              decoration: const InputDecoration(labelText: 'Course'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _yearLevelController,
+              decoration: const InputDecoration(labelText: 'Year Level'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _ageController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Age'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _hobbyController,
+              decoration: const InputDecoration(labelText: 'Hobby'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _studentIdController,
+              decoration: const InputDecoration(labelText: 'Student ID'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _emailController,
+              decoration: const InputDecoration(labelText: 'Email'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _favoriteSubjectController,
+              decoration: const InputDecoration(labelText: 'Favorite Subject'),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: _save,
+                  child: const Text('Save'),
+                ),
+              ],
             ),
           ],
         ),
