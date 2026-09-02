@@ -50,6 +50,7 @@ class MyHomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     List<int> valorantFriends = [0, 1, 2];
+    List<int> riotFriends = [3, 4];
     List<String> friends = [
       "MissYouLikeKrazy",
       "bread",
@@ -94,17 +95,20 @@ class MyHomePage extends StatelessWidget {
         ? Card(
             clipBehavior: Clip.antiAlias,
             elevation: 2.0,
-            child: ListView.builder(
-              itemCount: valorantFriends.length,
-              itemBuilder: (context, index) {
-                return ListTile(
-                  // mainAxisAlignment: MainAxisAlignment.center,
-                  // children: [
-                  //   Text(friends[valorantFriends[index]]),
-                  // ],
-                  title: Text(friends[valorantFriends[index]]),
-                );
-              },
+            child: SizedBox(
+              height: 50,
+              child: ListView.builder(
+                itemCount: valorantFriends.length,
+                itemBuilder: (context, index) {
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(friends[valorantFriends[index]]),
+                    ],
+                    // title: Text(friends[valorantFriends[index]]),
+                  );
+                },
+              ),
             ),
           )
         : Card(
@@ -124,9 +128,20 @@ class MyHomePage extends StatelessWidget {
         ? Card(
             clipBehavior: Clip.antiAlias,
             elevation: 2.0,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [],
+            child: SizedBox(
+              height: 50,
+              child: ListView.builder(
+                itemCount: riotFriends.length,
+                itemBuilder: (context, index) {
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(friends[riotFriends[index]]),
+                    ],
+                    // title: Text(friends[valorantFriends[index]]),
+                  );
+                },
+              ),
             ),
           )
         : Card(
