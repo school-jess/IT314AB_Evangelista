@@ -50,11 +50,25 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   late final List<Student> _records;
+  bool isLoading = false;
+
+  Future<List<Student>> getStudents() async {
+    await Future.delayed(const Duration(seconds: 5));
+    return widget.records;
+  }
 
   @override
   void initState() {
     super.initState();
-    _records = [...widget.records];
+    setState(() {
+      isLoading = true;
+    });
+    getStudents().then((res) {
+      _records = [...res];
+      setState(() {
+        isLoading = false;
+      });
+    });
   }
 
   void _removeStudent(Student student) {
@@ -79,7 +93,9 @@ class _MyHomePageState extends State<MyHomePage> {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: const Text('Students'),
       ),
-      body: _records.isEmpty
+      body: isLoading
+          ? const Text("Fetching students")
+          : _records.isEmpty
           ? const EmptyStudentsView()
           : ListView.builder(
               padding: const EdgeInsets.all(16),
@@ -153,100 +169,137 @@ class ChoosableStudentCard extends StatefulWidget {
 
 class _ChoosableStudentCardState extends State<ChoosableStudentCard> {
   bool isFavorite = false;
+  bool isActive = false;
+  bool isShown = true;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      elevation: 2.0,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Image.asset(
-                widget.student.image,
-                height: 150,
-                fit: BoxFit.contain,
+    return isShown
+        ? Card(
+            clipBehavior: Clip.antiAlias,
+            elevation: 2.0,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Image.asset(
+                      widget.student.image,
+                      height: 150,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    widget.student.name,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${widget.student.course} - ${widget.student.yearLevel}',
+                    style: const TextStyle(fontSize: 18),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Age: ${widget.student.age}',
+                    style: const TextStyle(fontSize: 18),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Hobby: ${widget.student.hobby}',
+                    style: const TextStyle(fontSize: 18),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Student ID: ${widget.student.studentId}',
+                    style: const TextStyle(fontSize: 18),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Email: ${widget.student.email}',
+                    style: const TextStyle(fontSize: 18),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Favorite Subject: ${widget.student.favoriteSubject}',
+                    style: const TextStyle(fontSize: 18),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            isFavorite = !isFavorite;
+                          });
+                        },
+                        child: Text(isFavorite ? "Unfavorite" : "Favorite"),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            isActive = !isActive;
+                          });
+                        },
+                        child: Text(isActive ? "Unactivate" : "Activate"),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            isShown = !isShown;
+                          });
+                        },
+                        child: Text("Hide"),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton(
+                        onPressed: widget.onRemove,
+                        child: Text("Remove"),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton(onPressed: widget.onEdit, child: Text("Edit")),
+                    ],
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    isFavorite
+                        ? "You have favorited this student"
+                        : "You have unfavorited this student",
+                    style: const TextStyle(fontSize: 18),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    isActive
+                        ? "This student is active"
+                        : "This student is not active",
+                    style: const TextStyle(fontSize: 18),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 16),
-            Text(
-              widget.student.name,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          )
+        : Card(
+            clipBehavior: Clip.antiAlias,
+            elevation: 2.0,
+            child: TextButton(
+              onPressed: () {
+                setState(() {
+                  isShown = !isShown;
+                });
+              },
+              child: Text("Show"),
             ),
-            const SizedBox(height: 8),
-            Text(
-              '${widget.student.course} - ${widget.student.yearLevel}',
-              style: const TextStyle(fontSize: 18),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Age: ${widget.student.age}',
-              style: const TextStyle(fontSize: 18),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Hobby: ${widget.student.hobby}',
-              style: const TextStyle(fontSize: 18),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Student ID: ${widget.student.studentId}',
-              style: const TextStyle(fontSize: 18),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Email: ${widget.student.email}',
-              style: const TextStyle(fontSize: 18),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Favorite Subject: ${widget.student.favoriteSubject}',
-              style: const TextStyle(fontSize: 18),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                TextButton(
-                  onPressed: () {
-                    setState(() {
-                      isFavorite = !isFavorite;
-                    });
-                  },
-                  child: Text(isFavorite ? "Unfavorite" : "Favorite"),
-                ),
-                const SizedBox(width: 8),
-                TextButton(
-                  onPressed: widget.onRemove,
-                  child: Text("Remove"),
-                ),
-                const SizedBox(width: 8),
-                TextButton(
-                  onPressed: widget.onEdit,
-                  child: Text("Edit"),
-                ),
-              ],
-            ),
-            const SizedBox(width: 8),
-            Text(
-              isFavorite
-                  ? "You have favorited this student"
-                  : "You have unfavorited this student",
-              style: const TextStyle(fontSize: 18),
-            ),
-          ],
-        ),
-      ),
-    );
+          );
   }
 }
 
-Future<Student?> showStudentEditSheet(
-  BuildContext context,
-  Student student,
-) {
+Future<Student?> showStudentEditSheet(BuildContext context, Student student) {
   return showModalBottomSheet<Student>(
     context: context,
     isScrollControlled: true,
@@ -279,10 +332,14 @@ class _StudentEditSheetState extends State<_StudentEditSheet> {
     super.initState();
     _nameController = TextEditingController(text: widget.student.name);
     _courseController = TextEditingController(text: widget.student.course);
-    _yearLevelController = TextEditingController(text: widget.student.yearLevel);
+    _yearLevelController = TextEditingController(
+      text: widget.student.yearLevel,
+    );
     _ageController = TextEditingController(text: '${widget.student.age}');
     _hobbyController = TextEditingController(text: widget.student.hobby);
-    _studentIdController = TextEditingController(text: widget.student.studentId);
+    _studentIdController = TextEditingController(
+      text: widget.student.studentId,
+    );
     _emailController = TextEditingController(text: widget.student.email);
     _favoriteSubjectController = TextEditingController(
       text: widget.student.favoriteSubject,
@@ -386,10 +443,7 @@ class _StudentEditSheetState extends State<_StudentEditSheet> {
                   child: const Text('Cancel'),
                 ),
                 const SizedBox(width: 8),
-                FilledButton(
-                  onPressed: _save,
-                  child: const Text('Save'),
-                ),
+                FilledButton(onPressed: _save, child: const Text('Save')),
               ],
             ),
           ],
