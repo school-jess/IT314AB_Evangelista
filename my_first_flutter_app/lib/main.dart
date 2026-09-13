@@ -8,9 +8,9 @@ void main() {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key, this.records = students});
-
   final List<Student> records;
+
+  const MyApp({super.key, this.records = students});
 
   @override
   Widget build(BuildContext context) {
@@ -34,23 +34,29 @@ class MyApp extends StatelessWidget {
           bodyMedium: TextStyle(color: Color(0xFFCBCCC6)),
         ),
       ),
-      home: MyHomePage(records: records),
+      routes: {
+        "/": (context) => MyHomePage(records: records),
+        "/student-list": (context) => StudentListView(),
+        "/add-student": (context) => AddStudentView(),
+        "/student-details": (context) => const StudentView(),
+      },
     );
   }
 }
 
 class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, this.records = students});
-
   final List<Student> records;
+
+  const MyHomePage({super.key, this.records = students});
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  late final List<Student> _records;
   bool isLoading = false;
+  final ValueNotifier<({bool isLoading, List<Student> records})> studentState =
+      ValueNotifier((isLoading: true, records: <Student>[]));
 
   Future<List<Student>> getStudents() async {
     await Future.delayed(const Duration(seconds: 5));
@@ -60,56 +66,181 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
-    setState(() {
-      isLoading = true;
-    });
     getStudents().then((res) {
-      _records = [...res];
-      setState(() {
-        isLoading = false;
-      });
+      studentState.value = (isLoading: false, records: [...res]);
     });
   }
 
   void _removeStudent(Student student) {
-    setState(() {
-      _records.remove(student);
-    });
+    final updatedList = studentState.value.records
+        .where((s) => s.studentId != student.studentId)
+        .toList();
+
+    studentState.value = (
+      isLoading: studentState.value.isLoading,
+      records: updatedList,
+    );
   }
 
   Future<void> _editStudent(Student student) async {
-    final updated = await showStudentEditSheet(context, student);
-    if (updated != null) {
-      setState(() {
-        _records[_records.indexOf(student)] = updated;
-      });
-    }
+    showStudentEditSheet(context, student);
+
+    final updatedList = studentState.value.records.map((s) {
+      if (s.studentId == student.studentId) {
+        return student;
+      }
+      return s;
+    }).toList();
+
+    studentState.value = (
+      isLoading: studentState.value.isLoading,
+      records: updatedList,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    Widget mainScreen = Padding(
+      padding: const EdgeInsets.all(8),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            TextButton(
+              onPressed: () {
+                Navigator.pushNamed(
+                  context,
+                  "/student-list",
+                  arguments: {
+                    "stateNotifier": studentState,
+                    "onRemove": _removeStudent,
+                    "onEdit": _editStudent,
+                  },
+                );
+              },
+              child: const Text("Students"),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pushNamed(
+                  context,
+                  "/add-student",
+                );
+              },
+              child: const Text("Add Student"),
+            ),
+          ],
+        ),
+      ),
+    );
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: const Text('Students'),
       ),
-      body: isLoading
-          ? const Text("Fetching students")
-          : _records.isEmpty
-          ? const EmptyStudentsView()
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _records.length,
-              itemBuilder: (context, index) => Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: ChoosableStudentCard(
-                  key: ValueKey(_records[index].studentId),
-                  student: _records[index],
-                  onRemove: () => _removeStudent(_records[index]),
-                  onEdit: () => _editStudent(_records[index]),
+      body: mainScreen,
+    );
+  }
+}
+
+class AddStudentView extends StatefulWidget {
+  const AddStudentView({super.key});
+
+  @override
+  State<AddStudentView> createState() => _AddStudentViewState();
+}
+
+class _AddStudentViewState extends State<AddStudentView> {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Add Student")),
+      body: const Text("hello"),
+    );
+  }
+}
+
+class StudentListView extends StatelessWidget {
+  const StudentListView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final args =
+        ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+
+    var stateNotifier = args["stateNotifier"] as ValueNotifier<({bool isLoading, List<Student> records})>;
+
+    return ValueListenableBuilder(
+      valueListenable: stateNotifier,
+      builder: (context, state, child) {
+        return Scaffold(
+          appBar: AppBar(title: const Text("Student List")),
+          body: state.isLoading
+              ? const Center(child: Text("Fetching students..."))
+              : state.records.isEmpty
+              ? const EmptyStudentsView()
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: state.records.length,
+                  itemBuilder: (context, index) {
+                    final currentStudent = state.records[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.pushNamed(
+                            context,
+                            "/student-details",
+                            arguments: {"student": currentStudent},
+                          );
+                        },
+                        child: ChoosableStudentCard(
+                          key: ValueKey(currentStudent.studentId),
+                          student: currentStudent,
+                          onRemove: () => args["onRemove"](currentStudent),
+                          onEdit: () => args["onEdit"](currentStudent),
+                        ),
+                      ),
+                    );
+                  },
                 ),
-              ),
+        );
+      },
+    );
+  }
+}
+
+class StudentView extends StatelessWidget {
+  const StudentView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final args =
+        ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+
+    return Scaffold(
+      appBar: AppBar(title: Text("Student: ${args["student"].name}")),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.asset(args["student"].image, height: 128),
+            const SizedBox(height: 8),
+            Text(
+              "${args["student"].name} ${args["student"].course}-${args["student"].yearLevel}",
             ),
+            const SizedBox(height: 8),
+            Text("Student ID: ${args["student"].studentId}"),
+            const SizedBox(height: 8),
+            Text("Email: ${args["student"].email}"),
+            const SizedBox(height: 8),
+            Text("Favorite Subject: ${args["student"].favoriteSubject}"),
+            const SizedBox(height: 8),
+            Text("Hobby: ${args["student"].hobby}"),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
     );
   }
 }
