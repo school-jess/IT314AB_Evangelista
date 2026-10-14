@@ -1,15 +1,15 @@
 class Student {
   final String image;
-  final String name;
-  final String course;
-  final String yearLevel;
-  final int age;
-  final String hobby;
-  final String studentId;
-  final String email;
-  final String favoriteSubject;
+  String name;
+  String course;
+  String yearLevel;
+  int age;
+  String hobby;
+  String studentId;
+  String email;
+  String favoriteSubject;
 
-  const Student({
+  Student({
     required this.image,
     required this.name,
     required this.course,
@@ -20,4 +20,32 @@ class Student {
     required this.email,
     required this.favoriteSubject,
   });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'image': image,
+      'name': name,
+      'course': course,
+      'age': age,
+      'hobby': hobby,
+      'studentId': studentId,
+      'email': email,
+      'favoriteSubject': favoriteSubject,
+      'yearLevel': yearLevel,
+    };
+  }
+
+  factory Student.fromJson(Map<String, dynamic> json) {
+    return Student(
+      image: json['image'] ?? '',
+      name: json['name'] ?? '',
+      course: json['course'] ?? '',
+      age: json['age'] ?? 0,
+      hobby: json['hobby'] ?? '',
+      studentId: json['studentId'] ?? '',
+      email: json['email'] ?? '',
+      favoriteSubject: json['favoriteSubject'] ?? '',
+      yearLevel: json['yearLevel'] ?? '',
+    );
+  }
 }

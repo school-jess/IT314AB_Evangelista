@@ -1,16 +1,37 @@
 import 'package:flutter/material.dart';
 
-import 'data/students_data.dart';
 import 'models/student.dart';
+import 'dart:io';
+import 'dart:convert';
 
-void main() {
-  runApp(MyApp(records: studentsSortedByName));
+var isLoading = true;
+var students = <Student>[];
+var studentDataFile = File("studentData.json");
+
+Future<List<Student>> getStudents() async {
+  if (!await studentDataFile.exists()) {
+    isLoading = false;
+    return [];
+  }
+  var studentDataContents = await studentDataFile.readAsString();
+  if (studentDataContents.trim().isEmpty) {
+    isLoading = false;
+    return [];
+  }
+  var decodedData = jsonDecode(studentDataContents) as List<dynamic>;
+
+  var studentData = decodedData.map((json) => Student.fromJson(json)).toList();
+  isLoading = false;
+  return studentData;
+}
+
+void main() async {
+  students = await getStudents();
+  runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  final List<Student> records;
-
-  const MyApp({super.key, this.records = students});
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +56,7 @@ class MyApp extends StatelessWidget {
         ),
       ),
       routes: {
-        "/": (context) => MyHomePage(records: records),
+        "/": (context) => MyHomePage(),
         "/student-list": (context) => StudentListView(),
         "/add-student": (context) => AddStudentView(),
         "/student-details": (context) => const StudentView(),
@@ -44,59 +65,8 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  final List<Student> records;
-
-  const MyHomePage({super.key, this.records = students});
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  bool isLoading = false;
-  final ValueNotifier<({bool isLoading, List<Student> records})> studentState =
-      ValueNotifier((isLoading: true, records: <Student>[]));
-
-  Future<List<Student>> getStudents() async {
-    await Future.delayed(const Duration(seconds: 5));
-    return widget.records;
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    getStudents().then((res) {
-      studentState.value = (isLoading: false, records: [...res]);
-    });
-  }
-
-  void _removeStudent(Student student) {
-    final updatedList = studentState.value.records
-        .where((s) => s.studentId != student.studentId)
-        .toList();
-
-    studentState.value = (
-      isLoading: studentState.value.isLoading,
-      records: updatedList,
-    );
-  }
-
-  Future<void> _editStudent(Student student) async {
-    showStudentEditSheet(context, student);
-
-    final updatedList = studentState.value.records.map((s) {
-      if (s.studentId == student.studentId) {
-        return student;
-      }
-      return s;
-    }).toList();
-
-    studentState.value = (
-      isLoading: studentState.value.isLoading,
-      records: updatedList,
-    );
-  }
+class MyHomePage extends StatelessWidget {
+  const MyHomePage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -108,24 +78,13 @@ class _MyHomePageState extends State<MyHomePage> {
           children: [
             TextButton(
               onPressed: () {
-                Navigator.pushNamed(
-                  context,
-                  "/student-list",
-                  arguments: {
-                    "stateNotifier": studentState,
-                    "onRemove": _removeStudent,
-                    "onEdit": _editStudent,
-                  },
-                );
+                Navigator.pushNamed(context, "/student-list");
               },
               child: const Text("Students"),
             ),
             TextButton(
               onPressed: () {
-                Navigator.pushNamed(
-                  context,
-                  "/add-student",
-                );
+                Navigator.pushNamed(context, "/add-student");
               },
               child: const Text("Add Student"),
             ),
@@ -143,6 +102,197 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 }
 
+class AddStudentForm extends StatefulWidget {
+  const AddStudentForm({super.key});
+
+  @override
+  State<AddStudentForm> createState() => _AddStudentForm();
+}
+
+class _AddStudentForm extends State<AddStudentForm> {
+  final studentIdController = TextEditingController();
+  final fullNameController = TextEditingController();
+  final courseController = TextEditingController();
+  final yearLevelController = TextEditingController();
+  final emailAddressController = TextEditingController();
+  final ageController = TextEditingController();
+  final hobbyController = TextEditingController();
+  final favoriteSubjectController = TextEditingController();
+  final _addStudentFormKey = GlobalKey<FormState>();
+
+  @override
+  void dispose() {
+    studentIdController.dispose();
+    fullNameController.dispose();
+    courseController.dispose();
+    yearLevelController.dispose();
+    emailAddressController.dispose();
+    ageController.dispose();
+    hobbyController.dispose();
+    favoriteSubjectController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Form(
+      key: _addStudentFormKey,
+      child: Column(
+        children: [
+          TextFormField(
+            controller: studentIdController,
+            validator: (val) {
+              if (val == null || val.isEmpty) {
+                return "Student ID field is empty";
+              }
+              if (students
+                  .map((student) => student.studentId == val)
+                  .any((student) => student)) {
+                return "Student ID field is taken";
+              }
+              return null;
+            },
+            decoration: InputDecoration(
+              border: OutlineInputBorder(),
+              hintText: "Student ID",
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: fullNameController,
+            validator: (val) {
+              if (val == null || val.isEmpty) {
+                return "Full Name field is empty";
+              }
+              return null;
+            },
+            decoration: InputDecoration(
+              border: OutlineInputBorder(),
+              hintText: "Full Name",
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: courseController,
+            validator: (val) {
+              if (val == null || val.isEmpty) {
+                return "Course field is empty";
+              }
+              return null;
+            },
+            decoration: InputDecoration(
+              border: OutlineInputBorder(),
+              hintText: "Course",
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: yearLevelController,
+            validator: (val) {
+              if (val == null || val.isEmpty) {
+                return "Year field is empty";
+              }
+              return null;
+            },
+            decoration: InputDecoration(
+              border: OutlineInputBorder(),
+              hintText: "Year Level",
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: emailAddressController,
+            validator: (val) {
+              if (val == null || val.isEmpty) {
+                return "Email Address field is empty";
+              }
+              var emailValidator = RegExp(
+                r"[a-z0-9\.]+@[a-z0-9]+\.[a-z0-9]{3}",
+              );
+              if (!emailValidator.hasMatch(val)) {
+                return "Email Address field is invalid";
+              }
+              return null;
+            },
+            decoration: InputDecoration(
+              border: OutlineInputBorder(),
+              hintText: "Email Address",
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: ageController,
+            validator: (val) {
+              if (val == null || val.isEmpty) {
+                return "Age field is empty";
+              }
+              if (val.contains(RegExp((r"[a-zA-Z]")))) {
+                return "inputed alphabet characters";
+              }
+              return null;
+            },
+            decoration: InputDecoration(
+              border: OutlineInputBorder(),
+              hintText: "Age",
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: hobbyController,
+            validator: (val) {
+              if (val == null || val.isEmpty) {
+                return "Hobby field is empty";
+              }
+              return null;
+            },
+            decoration: InputDecoration(
+              border: OutlineInputBorder(),
+              hintText: "Hobby",
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: favoriteSubjectController,
+            validator: (val) {
+              if (val == null || val.isEmpty) {
+                return "Favorite Subject field is empty";
+              }
+              return null;
+            },
+            decoration: InputDecoration(
+              border: OutlineInputBorder(),
+              hintText: "Favorite Subject",
+            ),
+          ),
+          const SizedBox(height: 10),
+          ElevatedButton(
+            onPressed: () async {
+              if (_addStudentFormKey.currentState!.validate()) {
+                students.add(
+                  Student(
+                    image:
+                        'assets/images/wp4162286-celeste-game-wallpapers.png',
+                    name: fullNameController.text.trim(),
+                    course: courseController.text.trim(),
+                    age: int.parse(ageController.text.trim()),
+                    hobby: hobbyController.text.trim(),
+                    studentId: studentIdController.text.trim(),
+                    email: emailAddressController.text.trim(),
+                    favoriteSubject: favoriteSubjectController.text.trim(),
+                    yearLevel: yearLevelController.text.trim(),
+                  ),
+                );
+                await studentDataFile.writeAsString(jsonEncode(students));
+              }
+            },
+            child: const Text("submit"),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class AddStudentView extends StatefulWidget {
   const AddStudentView({super.key});
 
@@ -155,57 +305,46 @@ class _AddStudentViewState extends State<AddStudentView> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Add Student")),
-      body: const Text("hello"),
+      body: const AddStudentForm(),
     );
   }
 }
 
-class StudentListView extends StatelessWidget {
+class StudentListView extends StatefulWidget {
   const StudentListView({super.key});
 
   @override
+  State<StudentListView> createState() => _StudentListView();
+}
+
+class _StudentListView extends State<StudentListView> {
+  @override
   Widget build(BuildContext context) {
-    final args =
-        ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
-
-    var stateNotifier = args["stateNotifier"] as ValueNotifier<({bool isLoading, List<Student> records})>;
-
-    return ValueListenableBuilder(
-      valueListenable: stateNotifier,
-      builder: (context, state, child) {
-        return Scaffold(
-          appBar: AppBar(title: const Text("Student List")),
-          body: state.isLoading
-              ? const Center(child: Text("Fetching students..."))
-              : state.records.isEmpty
-              ? const EmptyStudentsView()
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: state.records.length,
-                  itemBuilder: (context, index) {
-                    final currentStudent = state.records[index];
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: GestureDetector(
-                        onTap: () {
-                          Navigator.pushNamed(
-                            context,
-                            "/student-details",
-                            arguments: {"student": currentStudent},
-                          );
-                        },
-                        child: ChoosableStudentCard(
-                          key: ValueKey(currentStudent.studentId),
-                          student: currentStudent,
-                          onRemove: () => args["onRemove"](currentStudent),
-                          onEdit: () => args["onEdit"](currentStudent),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-        );
-      },
+    return Scaffold(
+      appBar: AppBar(title: const Text("Student List")),
+      body: isLoading
+          ? const Center(child: Text("Fetching students..."))
+          : students.isEmpty
+          ? const EmptyStudentsView()
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: students.length,
+              itemBuilder: (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.pushNamed(
+                        context,
+                        "/student-details",
+                        arguments: {"studentI": index},
+                      );
+                    },
+                    child: ChoosableStudentCard(studentI: index),
+                  ),
+                );
+              },
+            ),
     );
   }
 }
@@ -218,25 +357,28 @@ class StudentView extends StatelessWidget {
     final args =
         ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
 
+    var studentI = args["studentI"] as int;
+    var curStudent = students[studentI];
+
     return Scaffold(
-      appBar: AppBar(title: Text("Student: ${args["student"].name}")),
+      appBar: AppBar(title: Text("Student: ${curStudent.name}")),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset(args["student"].image, height: 128),
+            Image.asset(curStudent.image, height: 128),
             const SizedBox(height: 8),
             Text(
-              "${args["student"].name} ${args["student"].course}-${args["student"].yearLevel}",
+              "${curStudent.name} ${curStudent.course}-${curStudent.yearLevel}",
             ),
             const SizedBox(height: 8),
-            Text("Student ID: ${args["student"].studentId}"),
+            Text("Student ID: ${curStudent.studentId}"),
             const SizedBox(height: 8),
-            Text("Email: ${args["student"].email}"),
+            Text("Email: ${curStudent.email}"),
             const SizedBox(height: 8),
-            Text("Favorite Subject: ${args["student"].favoriteSubject}"),
+            Text("Favorite Subject: ${curStudent.favoriteSubject}"),
             const SizedBox(height: 8),
-            Text("Hobby: ${args["student"].hobby}"),
+            Text("Hobby: ${curStudent.hobby}"),
             const SizedBox(height: 8),
           ],
         ),
@@ -283,16 +425,9 @@ class EmptyStudentsView extends StatelessWidget {
 }
 
 class ChoosableStudentCard extends StatefulWidget {
-  final Student student;
-  final VoidCallback onRemove;
-  final VoidCallback onEdit;
+  final int studentI;
 
-  const ChoosableStudentCard({
-    super.key,
-    required this.student,
-    required this.onRemove,
-    required this.onEdit,
-  });
+  const ChoosableStudentCard({super.key, required this.studentI});
 
   @override
   State<ChoosableStudentCard> createState() => _ChoosableStudentCardState();
@@ -303,8 +438,18 @@ class _ChoosableStudentCardState extends State<ChoosableStudentCard> {
   bool isActive = false;
   bool isShown = true;
 
+  void onRemove() async {
+    students.remove(students[widget.studentI]);
+    await studentDataFile.writeAsString(jsonEncode(students));
+  }
+
+  void onEdit() {
+    showStudentEditSheet(context, widget.studentI);
+  }
+
   @override
   Widget build(BuildContext context) {
+    var curStudent = students[widget.studentI];
     return isShown
         ? Card(
             clipBehavior: Clip.antiAlias,
@@ -316,14 +461,14 @@ class _ChoosableStudentCardState extends State<ChoosableStudentCard> {
                 children: [
                   Center(
                     child: Image.asset(
-                      widget.student.image,
+                      curStudent.image,
                       height: 150,
                       fit: BoxFit.contain,
                     ),
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    widget.student.name,
+                    curStudent.name,
                     style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
@@ -331,32 +476,32 @@ class _ChoosableStudentCardState extends State<ChoosableStudentCard> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${widget.student.course} - ${widget.student.yearLevel}',
+                    '${curStudent.course} - ${curStudent.yearLevel}',
                     style: const TextStyle(fontSize: 18),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Age: ${widget.student.age}',
+                    'Age: ${curStudent.age}',
                     style: const TextStyle(fontSize: 18),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Hobby: ${widget.student.hobby}',
+                    'Hobby: ${curStudent.hobby}',
                     style: const TextStyle(fontSize: 18),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Student ID: ${widget.student.studentId}',
+                    'Student ID: ${curStudent.studentId}',
                     style: const TextStyle(fontSize: 18),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Email: ${widget.student.email}',
+                    'Email: ${curStudent.email}',
                     style: const TextStyle(fontSize: 18),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Favorite Subject: ${widget.student.favoriteSubject}',
+                    'Favorite Subject: ${curStudent.favoriteSubject}',
                     style: const TextStyle(fontSize: 18),
                   ),
                   const SizedBox(height: 8),
@@ -389,12 +534,9 @@ class _ChoosableStudentCardState extends State<ChoosableStudentCard> {
                         child: Text("Hide"),
                       ),
                       const SizedBox(width: 8),
-                      TextButton(
-                        onPressed: widget.onRemove,
-                        child: Text("Remove"),
-                      ),
+                      TextButton(onPressed: onRemove, child: Text("Remove")),
                       const SizedBox(width: 8),
-                      TextButton(onPressed: widget.onEdit, child: Text("Edit")),
+                      TextButton(onPressed: onEdit, child: Text("Edit")),
                     ],
                   ),
                   const SizedBox(width: 8),
@@ -430,52 +572,49 @@ class _ChoosableStudentCardState extends State<ChoosableStudentCard> {
   }
 }
 
-Future<Student?> showStudentEditSheet(BuildContext context, Student student) {
+Future<Student?> showStudentEditSheet(BuildContext context, int studentI) {
   return showModalBottomSheet<Student>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    builder: (context) => _StudentEditSheet(student: student),
+    builder: (context) => _StudentEditSheet(studentI: studentI),
   );
 }
 
 class _StudentEditSheet extends StatefulWidget {
-  final Student student;
+  final int studentI;
 
-  const _StudentEditSheet({required this.student});
+  const _StudentEditSheet({required this.studentI});
 
   @override
   State<_StudentEditSheet> createState() => _StudentEditSheetState();
 }
 
 class _StudentEditSheetState extends State<_StudentEditSheet> {
-  late final TextEditingController _nameController;
-  late final TextEditingController _courseController;
-  late final TextEditingController _yearLevelController;
-  late final TextEditingController _ageController;
-  late final TextEditingController _hobbyController;
-  late final TextEditingController _studentIdController;
-  late final TextEditingController _emailController;
-  late final TextEditingController _favoriteSubjectController;
-
-  @override
-  void initState() {
-    super.initState();
-    _nameController = TextEditingController(text: widget.student.name);
-    _courseController = TextEditingController(text: widget.student.course);
-    _yearLevelController = TextEditingController(
-      text: widget.student.yearLevel,
-    );
-    _ageController = TextEditingController(text: '${widget.student.age}');
-    _hobbyController = TextEditingController(text: widget.student.hobby);
-    _studentIdController = TextEditingController(
-      text: widget.student.studentId,
-    );
-    _emailController = TextEditingController(text: widget.student.email);
-    _favoriteSubjectController = TextEditingController(
-      text: widget.student.favoriteSubject,
-    );
-  }
+  // TODO should also do the same validation here as when creating a student
+  late final TextEditingController _nameController = TextEditingController(
+    text: students[widget.studentI].name,
+  );
+  late final TextEditingController _courseController = TextEditingController(
+    text: students[widget.studentI].course,
+  );
+  late final TextEditingController _yearLevelController = TextEditingController(
+    text: students[widget.studentI].yearLevel,
+  );
+  late final TextEditingController _ageController = TextEditingController(
+    text: "${students[widget.studentI].age}",
+  );
+  late final TextEditingController _hobbyController = TextEditingController(
+    text: students[widget.studentI].hobby,
+  );
+  late final TextEditingController _studentIdController = TextEditingController(
+    text: students[widget.studentI].studentId,
+  );
+  late final TextEditingController _emailController = TextEditingController(
+    text: students[widget.studentI].email,
+  );
+  late final TextEditingController _favoriteSubjectController =
+      TextEditingController(text: students[widget.studentI].favoriteSubject);
 
   @override
   void dispose() {
@@ -490,14 +629,30 @@ class _StudentEditSheetState extends State<_StudentEditSheet> {
     super.dispose();
   }
 
-  void _save() {
+  void _save() async {
+    students[widget.studentI].name = _nameController.text.trim();
+    students[widget.studentI].course = _courseController.text.trim();
+    students[widget.studentI].yearLevel = _yearLevelController.text.trim();
+    students[widget.studentI].age =
+        int.tryParse(_ageController.text.trim()) ??
+        students[widget.studentI].age;
+    students[widget.studentI].hobby = _hobbyController.text.trim();
+    students[widget.studentI].studentId = _studentIdController.text.trim();
+    students[widget.studentI].email = _emailController.text.trim();
+    students[widget.studentI].favoriteSubject = _favoriteSubjectController.text
+        .trim();
+
+    await studentDataFile.writeAsString(jsonEncode(students));
+
     Navigator.of(context).pop(
       Student(
-        image: widget.student.image,
+        image: students[widget.studentI].image,
         name: _nameController.text.trim(),
         course: _courseController.text.trim(),
         yearLevel: _yearLevelController.text.trim(),
-        age: int.tryParse(_ageController.text.trim()) ?? widget.student.age,
+        age:
+            int.tryParse(_ageController.text.trim()) ??
+            students[widget.studentI].age,
         hobby: _hobbyController.text.trim(),
         studentId: _studentIdController.text.trim(),
         email: _emailController.text.trim(),
@@ -521,7 +676,7 @@ class _StudentEditSheetState extends State<_StudentEditSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Edit ${widget.student.name}',
+              'Edit ${students[widget.studentI].name}',
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
