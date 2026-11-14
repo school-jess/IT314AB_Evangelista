@@ -1,32 +1,50 @@
 import 'package:flutter/material.dart';
+import 'package:postgres/postgres.dart';
 
 import 'models/student.dart';
-import 'dart:io';
-import 'dart:convert';
 
-var isLoading = true;
-var students = <Student>[];
-var studentDataFile = File("studentData.json");
+Connection? connection;
 
-Future<List<Student>> getStudents() async {
-  if (!await studentDataFile.exists()) {
-    isLoading = false;
-    return [];
+Future<void> connectDb() async {
+  final endpoint = Endpoint(
+    host: 'ep-ancient-butterfly-a1f3ggyk-pooler.ap-southeast-1.aws.neon.tech',
+    port: 5432,
+    database: 'neondb',
+    username: 'neondb_owner',
+    password: 'npg_AWrZFUj6dS9V',
+  );
+  connection = await Connection.open(
+    endpoint,
+    settings: ConnectionSettings(sslMode: SslMode.require),
+  );
+}
+
+Future<List<Student>> _fetchStudents() async {
+  final db = connection;
+  if (db == null) {
+    throw StateError('Database connection is not available');
   }
-  var studentDataContents = await studentDataFile.readAsString();
-  if (studentDataContents.trim().isEmpty) {
-    isLoading = false;
-    return [];
-  }
-  var decodedData = jsonDecode(studentDataContents) as List<dynamic>;
 
-  var studentData = decodedData.map((json) => Student.fromJson(json)).toList();
-  isLoading = false;
-  return studentData;
+  final result = await db.execute(Sql.named('SELECT * FROM "Student"'));
+  return result.map((row) => Student.fromJson(row.toColumnMap())).toList();
+}
+
+Future<Student?> _fetchStudentById(int studentId) async {
+  final db = connection;
+  if (db == null) {
+    throw StateError('Database connection is not available');
+  }
+
+  final result = await db.execute(
+    Sql.named('SELECT * FROM "Student" WHERE id = @studentId'),
+    parameters: {'studentId': studentId},
+  );
+  if (result.isEmpty) return null;
+  return Student.fromJson(result.first.toColumnMap());
 }
 
 void main() async {
-  students = await getStudents();
+  await connectDb();
   runApp(MyApp());
 }
 
@@ -119,6 +137,14 @@ class _AddStudentForm extends State<AddStudentForm> {
   final hobbyController = TextEditingController();
   final favoriteSubjectController = TextEditingController();
   final _addStudentFormKey = GlobalKey<FormState>();
+  late final Future<List<Student>> _studentsFuture;
+  List<Student> _students = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _studentsFuture = _fetchStudents();
+  }
 
   @override
   void dispose() {
@@ -145,7 +171,7 @@ class _AddStudentForm extends State<AddStudentForm> {
               if (val == null || val.isEmpty) {
                 return "Student ID field is empty";
               }
-              if (students
+              if (_students
                   .map((student) => student.studentId == val)
                   .any((student) => student)) {
                 return "Student ID field is taken";
@@ -267,22 +293,25 @@ class _AddStudentForm extends State<AddStudentForm> {
           const SizedBox(height: 10),
           ElevatedButton(
             onPressed: () async {
+              _students = await _studentsFuture;
+              if (!mounted) return;
               if (_addStudentFormKey.currentState!.validate()) {
-                students.add(
-                  Student(
-                    image:
-                        'assets/images/wp4162286-celeste-game-wallpapers.png',
-                    name: fullNameController.text.trim(),
-                    course: courseController.text.trim(),
-                    age: int.parse(ageController.text.trim()),
-                    hobby: hobbyController.text.trim(),
-                    studentId: studentIdController.text.trim(),
-                    email: emailAddressController.text.trim(),
-                    favoriteSubject: favoriteSubjectController.text.trim(),
-                    yearLevel: yearLevelController.text.trim(),
+                await connection?.execute(
+                  Sql.named(
+                    'INSERT INTO "Student" (image, name, course, yearLevel, age, hobby, studentId, email, favoriteSubject) VALUES (@image, @name, @course, @yearLevel, @age, @hobby, @studentId, @email, @favoriteSubject)',
                   ),
+                  parameters: {
+                    "image": "images/wp4162286-celeste-game-wallpapers.png",
+                    "name": fullNameController.text.trim(),
+                    "course": courseController.text.trim(),
+                    "yearLevel": yearLevelController.text,
+                    "age": ageController.text,
+                    "hobby": hobbyController.text.trim(),
+                    "studentId": studentIdController.text.trim(),
+                    "email": emailAddressController.text.trim(),
+                    "favoriteSubject": favoriteSubjectController.text.trim()
+                  },
                 );
-                await studentDataFile.writeAsString(jsonEncode(students));
               }
             },
             child: const Text("submit"),
@@ -318,70 +347,121 @@ class StudentListView extends StatefulWidget {
 }
 
 class _StudentListView extends State<StudentListView> {
+  late final Future<List<Student>> _studentsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _studentsFuture = _fetchStudents();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Student List")),
-      body: isLoading
-          ? const Center(child: Text("Fetching students..."))
-          : students.isEmpty
-          ? const EmptyStudentsView()
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: students.length,
-              itemBuilder: (context, index) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: GestureDetector(
-                    onTap: () {
-                      Navigator.pushNamed(
-                        context,
-                        "/student-details",
-                        arguments: {"studentI": index},
-                      );
-                    },
-                    child: ChoosableStudentCard(studentI: index),
-                  ),
-                );
-              },
-            ),
+      body: FutureBuilder<List<Student>>(
+        future: _studentsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: Text("Fetching students..."));
+          }
+          if (snapshot.hasError) {
+            return Center(
+              child: Text("Could not load students: ${snapshot.error}"),
+            );
+          }
+
+          final students = snapshot.data ?? [];
+          if (students.isEmpty) return const EmptyStudentsView();
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: students.length,
+            itemBuilder: (context, index) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.pushNamed(
+                      context,
+                      "/student-details",
+                      arguments: {"studentI": students[index].id},
+                    );
+                  },
+                  child: ChoosableStudentCard(student: students[index]),
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
 
-class StudentView extends StatelessWidget {
+class StudentView extends StatefulWidget {
   const StudentView({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  State<StudentView> createState() => _StudentViewState();
+}
+
+class _StudentViewState extends State<StudentView> {
+  late Future<Student?> _studentFuture;
+  bool _started = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+
     final args =
         ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+    _studentFuture = _fetchStudentById(args["studentI"] as int);
+    _started = true;
+  }
 
-    var studentI = args["studentI"] as int;
-    var curStudent = students[studentI];
-
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Student: ${curStudent.name}")),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Image.asset(curStudent.image, height: 128),
-            const SizedBox(height: 8),
-            Text(
-              "${curStudent.name} ${curStudent.course}-${curStudent.yearLevel}",
+      appBar: AppBar(title: const Text("Student Details")),
+      body: FutureBuilder<Student?>(
+        future: _studentFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(
+              child: Text("Could not load student: ${snapshot.error}"),
+            );
+          }
+
+          final student = snapshot.data;
+          if (student == null) {
+            return const Center(child: Text("Student not found"));
+          }
+
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.asset(student.image, height: 128),
+                const SizedBox(height: 8),
+                Text("${student.name} ${student.course}-${student.yearLevel}"),
+                const SizedBox(height: 8),
+                Text("Student ID: ${student.studentId}"),
+                const SizedBox(height: 8),
+                Text("Email: ${student.email}"),
+                const SizedBox(height: 8),
+                Text("Favorite Subject: ${student.favoriteSubject}"),
+                const SizedBox(height: 8),
+                Text("Hobby: ${student.hobby}"),
+                const SizedBox(height: 8),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text("Student ID: ${curStudent.studentId}"),
-            const SizedBox(height: 8),
-            Text("Email: ${curStudent.email}"),
-            const SizedBox(height: 8),
-            Text("Favorite Subject: ${curStudent.favoriteSubject}"),
-            const SizedBox(height: 8),
-            Text("Hobby: ${curStudent.hobby}"),
-            const SizedBox(height: 8),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -425,9 +505,9 @@ class EmptyStudentsView extends StatelessWidget {
 }
 
 class ChoosableStudentCard extends StatefulWidget {
-  final int studentI;
+  final Student student;
 
-  const ChoosableStudentCard({super.key, required this.studentI});
+  const ChoosableStudentCard({super.key, required this.student});
 
   @override
   State<ChoosableStudentCard> createState() => _ChoosableStudentCardState();
@@ -438,18 +518,19 @@ class _ChoosableStudentCardState extends State<ChoosableStudentCard> {
   bool isActive = false;
   bool isShown = true;
 
-  void onRemove() async {
-    students.remove(students[widget.studentI]);
-    await studentDataFile.writeAsString(jsonEncode(students));
+  Future<void> onRemove() async {
+    await connection?.execute(
+      Sql.named('DELETE FROM "Student" WHERE id = @studentI'),
+      parameters: {'studentI': widget.student.id},
+    );
   }
 
   void onEdit() {
-    showStudentEditSheet(context, widget.studentI);
+    showStudentEditSheet(context, widget.student.id);
   }
 
   @override
   Widget build(BuildContext context) {
-    var curStudent = students[widget.studentI];
     return isShown
         ? Card(
             clipBehavior: Clip.antiAlias,
@@ -461,14 +542,14 @@ class _ChoosableStudentCardState extends State<ChoosableStudentCard> {
                 children: [
                   Center(
                     child: Image.asset(
-                      curStudent.image,
+                      widget.student.image,
                       height: 150,
                       fit: BoxFit.contain,
                     ),
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    curStudent.name,
+                    widget.student.name,
                     style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
@@ -476,32 +557,32 @@ class _ChoosableStudentCardState extends State<ChoosableStudentCard> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${curStudent.course} - ${curStudent.yearLevel}',
+                    '${widget.student.course} - ${widget.student.yearLevel}',
                     style: const TextStyle(fontSize: 18),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Age: ${curStudent.age}',
+                    'Age: ${widget.student.age}',
                     style: const TextStyle(fontSize: 18),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Hobby: ${curStudent.hobby}',
+                    'Hobby: ${widget.student.hobby}',
                     style: const TextStyle(fontSize: 18),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Student ID: ${curStudent.studentId}',
+                    'Student ID: ${widget.student.studentId}',
                     style: const TextStyle(fontSize: 18),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Email: ${curStudent.email}',
+                    'Email: ${widget.student.email}',
                     style: const TextStyle(fontSize: 18),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Favorite Subject: ${curStudent.favoriteSubject}',
+                    'Favorite Subject: ${widget.student.favoriteSubject}',
                     style: const TextStyle(fontSize: 18),
                   ),
                   const SizedBox(height: 8),
@@ -572,19 +653,24 @@ class _ChoosableStudentCardState extends State<ChoosableStudentCard> {
   }
 }
 
-Future<Student?> showStudentEditSheet(BuildContext context, int studentI) {
+Future<Student?> showStudentEditSheet(
+  BuildContext context,
+  int studentI,
+) async {
+  final curStudent = await _fetchStudentById(studentI);
+  if (curStudent == null || !context.mounted) return null;
   return showModalBottomSheet<Student>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    builder: (context) => _StudentEditSheet(studentI: studentI),
+    builder: (context) => _StudentEditSheet(student: curStudent),
   );
 }
 
 class _StudentEditSheet extends StatefulWidget {
-  final int studentI;
+  final Student student;
 
-  const _StudentEditSheet({required this.studentI});
+  const _StudentEditSheet({required this.student});
 
   @override
   State<_StudentEditSheet> createState() => _StudentEditSheetState();
@@ -592,29 +678,15 @@ class _StudentEditSheet extends StatefulWidget {
 
 class _StudentEditSheetState extends State<_StudentEditSheet> {
   // TODO should also do the same validation here as when creating a student
-  late final TextEditingController _nameController = TextEditingController(
-    text: students[widget.studentI].name,
-  );
-  late final TextEditingController _courseController = TextEditingController(
-    text: students[widget.studentI].course,
-  );
-  late final TextEditingController _yearLevelController = TextEditingController(
-    text: students[widget.studentI].yearLevel,
-  );
-  late final TextEditingController _ageController = TextEditingController(
-    text: "${students[widget.studentI].age}",
-  );
-  late final TextEditingController _hobbyController = TextEditingController(
-    text: students[widget.studentI].hobby,
-  );
-  late final TextEditingController _studentIdController = TextEditingController(
-    text: students[widget.studentI].studentId,
-  );
-  late final TextEditingController _emailController = TextEditingController(
-    text: students[widget.studentI].email,
-  );
-  late final TextEditingController _favoriteSubjectController =
-      TextEditingController(text: students[widget.studentI].favoriteSubject);
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _courseController = TextEditingController();
+  final TextEditingController _yearLevelController = TextEditingController();
+  final TextEditingController _ageController = TextEditingController();
+  final TextEditingController _hobbyController = TextEditingController();
+  final TextEditingController _studentIdController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _favoriteSubjectController =
+      TextEditingController();
 
   @override
   void dispose() {
@@ -629,30 +701,47 @@ class _StudentEditSheetState extends State<_StudentEditSheet> {
     super.dispose();
   }
 
-  void _save() async {
-    students[widget.studentI].name = _nameController.text.trim();
-    students[widget.studentI].course = _courseController.text.trim();
-    students[widget.studentI].yearLevel = _yearLevelController.text.trim();
-    students[widget.studentI].age =
-        int.tryParse(_ageController.text.trim()) ??
-        students[widget.studentI].age;
-    students[widget.studentI].hobby = _hobbyController.text.trim();
-    students[widget.studentI].studentId = _studentIdController.text.trim();
-    students[widget.studentI].email = _emailController.text.trim();
-    students[widget.studentI].favoriteSubject = _favoriteSubjectController.text
-        .trim();
+  @override
+  void initState() {
+    super.initState();
+    _nameController.text = widget.student.name;
+    _courseController.text = widget.student.course;
+    _yearLevelController.text = widget.student.yearLevel;
+    _ageController.text = widget.student.age.toString();
+    _hobbyController.text = widget.student.hobby;
+    _studentIdController.text = widget.student.studentId;
+    _emailController.text = widget.student.email;
+    _favoriteSubjectController.text = widget.student.favoriteSubject;
+  }
 
-    await studentDataFile.writeAsString(jsonEncode(students));
+  Future<void> _save() async {
+    await connection?.execute(
+          Sql.named(
+            'UPDATE "Student" SET image=@image, name=@name, course=@course, yearLevel=@yearLevel, age=@age, hobby=@hobby, studentId=@studentId, email=@email, favoriteSubject=@favoriteSubject where id = @id',
+          ),
+          parameters: {
+            'id': widget.student.id,
+            'image': widget.student.image,
+            'name': _nameController.text.trim(),
+            'course': _courseController.text.trim(),
+            'yearLevel': _yearLevelController.text.trim(),
+            'age':
+                int.tryParse(_ageController.text.trim()) ?? widget.student.age,
+            'hobby': _hobbyController.text.trim(),
+            'studentId': _studentIdController.text.trim(),
+            'email': _emailController.text.trim(),
+            'favoriteSubject': _favoriteSubjectController.text.trim(),
+          },
+        );
 
     Navigator.of(context).pop(
       Student(
-        image: students[widget.studentI].image,
+        id: widget.student.id,
+        image: widget.student.image,
         name: _nameController.text.trim(),
         course: _courseController.text.trim(),
         yearLevel: _yearLevelController.text.trim(),
-        age:
-            int.tryParse(_ageController.text.trim()) ??
-            students[widget.studentI].age,
+        age: int.tryParse(_ageController.text.trim()) ?? widget.student.age,
         hobby: _hobbyController.text.trim(),
         studentId: _studentIdController.text.trim(),
         email: _emailController.text.trim(),
@@ -676,7 +765,7 @@ class _StudentEditSheetState extends State<_StudentEditSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Edit ${students[widget.studentI].name}',
+              'Edit ${widget.student.name}',
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),

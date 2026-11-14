@@ -1,4 +1,5 @@
 class Student {
+  final int id;
   final String image;
   String name;
   String course;
@@ -10,6 +11,7 @@ class Student {
   String favoriteSubject;
 
   Student({
+    required this.id,
     required this.image,
     required this.name,
     required this.course,
@@ -23,6 +25,7 @@ class Student {
 
   Map<String, dynamic> toJson() {
     return {
+      'id': id,
       'image': image,
       'name': name,
       'course': course,
@@ -37,15 +40,16 @@ class Student {
 
   factory Student.fromJson(Map<String, dynamic> json) {
     return Student(
+      id: json['id'] ?? 0,
       image: json['image'] ?? '',
       name: json['name'] ?? '',
       course: json['course'] ?? '',
       age: json['age'] ?? 0,
       hobby: json['hobby'] ?? '',
-      studentId: json['studentId'] ?? '',
+      studentId: json['studentId'] ?? json['studentid'] ?? '',
       email: json['email'] ?? '',
-      favoriteSubject: json['favoriteSubject'] ?? '',
-      yearLevel: json['yearLevel'] ?? '',
+      favoriteSubject: json['favoriteSubject'] ?? json['favoritesubject'] ?? '',
+      yearLevel: json['yearLevel'] ?? json['yearlevel'] ?? '',
     );
   }
 }
